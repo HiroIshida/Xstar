@@ -29,7 +29,7 @@ mutable struct Node{N}
 end
 Node(x, cost, idx) = Node(x, cost, idx, nothing)
 
-function visualize!(box::BoxSpace{2}, fig)
+function visualize!(box::BoxSpace, fig)
     v1 = [box.lo[1], box.lo[2]]
     v2 = [box.hi[1], box.lo[2]]
     v3 = [box.hi[1], box.hi[2]]
@@ -133,7 +133,7 @@ function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
     return node_nearest, x_new
 end
 
-function visualize!(rrtstar::RRTStar{2}, fig)
+function visualize!(rrtstar::RRTStar, fig)
     visualize!(rrtstar.cspace, fig)
     xs, ys = [[n.x[i] for n in rrtstar.nodes] for i in 1:2]
     scatter!(fig, xs, ys, label="", marker=(:green))
