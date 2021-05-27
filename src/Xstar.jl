@@ -1,10 +1,18 @@
 module Xstar
 
+using PyCall
+const __reeds_shepp__ = PyCall.PyNULL()
+
 using Plots
 using StaticArrays
 using LinearAlgebra
 export ConfigurationSpace, BoxSpace, uniform_sampling, visualize!
+export Euclidean, ReedsSheppMetric, waypoints
 export RRTStar, extend, is_obstacle_free
+
+function __init__()
+    copy!(__reeds_shepp__, pyimport("reeds_shepp"))
+end
 
 abstract type ConfigurationSpace{N} end
 uniform_sampling(cspace::ConfigurationSpace) = error("please implement this")
@@ -51,19 +59,31 @@ abstract type Metric end
 struct Euclidean <:Metric end
 (::Euclidean)(x1, x2) = norm(x1 - x2)
 
-mutable struct RRTStar{N}
+struct ReedsSheppMetric
+    r::Float64
+end
+(metric::ReedsSheppMetric)(x1, x2) = __reeds_shepp__.path_length(x1, x2, metric.r)
+function waypoints(metric::ReedsSheppMetric, x1, x2, step)
+    waypoints = __reeds_shepp__.path_sample(x1, x2, metric.r, step)
+end
+
+
+mutable struct RRTStar{N, MT}
     dim::Int
     cspace::ConfigurationSpace
     x_start::SVector{N}
     x_goal::SVector{N}
     nodes::Vector{Node{N}}
-    metric::Metric
+    metric::MT
     mu::Float64
 end
-function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.1) where N
+function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.1, metric=nothing) where N
+    if isnothing(metric)
+        metric = Euclidean()
+    end
     nodes = Vector{Node{N}}(undef, 0)
     push!(nodes, Node(x_start, 0.0, 1))
-    RRTStar{N}(N, cspace, x_start, x_goal, nodes, Euclidean(), mu)
+    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, nodes, metric, mu)
 end
 
 function extend(rrtstar::RRTStar{N}) where N
@@ -101,13 +121,22 @@ end
 
 is_obstacle_free(rrtstar::RRTStar, x) = error("please implement this")
 
-function is_obstacle_free(rrtstar::RRTStar, node_start::Node, x_target)
+function is_obstacle_free(rrtstar::RRTStar{<:Any, Euclidean}, node_start::Node, x_target)
     # assume x1 is known to be obstacle free
     n_wp = 5
     x_start = node_start.x
     step = (x_target - x_start)/n_wp
     for i in 1:n_wp
         is_obstacle_free(rrtstar, x_start + step * i) || (return false)
+    end
+    return true
+end
+
+function is_obstacle_free(rrtstar::RRTStar{3, ReedsSheppMetric}, node_start::Node, x_target)
+    pts = waypoints(rrtstar.metric, node_start.x, x_target, 0.1)
+    for pt in pts
+        p = SVector{3, Float64}([pt[1], pt[2], pt[3]])
+        is_obstacle_free(rrtstar, p) || (return false)
     end
     return true
 end
@@ -133,11 +162,7 @@ function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
     return node_nearest, x_new
 end
 
-function visualize!(rrtstar::RRTStar, fig)
-    visualize!(rrtstar.cspace, fig)
-    xs, ys = [[n.x[i] for n in rrtstar.nodes] for i in 1:2]
-    scatter!(fig, xs, ys, label="", marker=(:green))
-
+function visualize_nodes!(rrtstar::RRTStar, fig)
     for node in rrtstar.nodes
         isnothing(node.parent_idx) && continue
 
@@ -147,6 +172,29 @@ function visualize!(rrtstar::RRTStar, fig)
         xs, ys = [[x_child[i], x_parent[i]] for i in 1:2]
         plot!(fig, xs, ys, label="", line=(:black))
     end
+end
+
+function visualize_nodes!(rrtstar::RRTStar{3, ReedsSheppMetric}, fig)
+    for node in rrtstar.nodes
+        isnothing(node.parent_idx) && continue
+
+        node_parent = rrtstar.nodes[node.parent_idx]
+        x_child = node.x
+        x_parent = node_parent.x
+
+        pts = waypoints(rrtstar.metric, x_child, x_parent, 0.005)
+        xs = [p[1] for p in pts]
+        ys = [p[2] for p in pts]
+        plot!(fig, xs, ys, label="", line=(:black))
+    end
+end
+
+function visualize!(rrtstar::RRTStar, fig)
+    visualize!(rrtstar.cspace, fig)
+    xs, ys = [[n.x[i] for n in rrtstar.nodes] for i in 1:2]
+    scatter!(fig, xs, ys, label="", marker=(:green))
+    visualize_nodes!(rrtstar, fig)
+
 end
 
 

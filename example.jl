@@ -15,8 +15,8 @@ end
 cspace = BoxSpace(3, [0.0, 0, 0.0], [1., 1., 1.])
 x_start = SVector{3, Float64}([0.1, 0.1, 0.1])
 x_goal = SVector{3, Float64}([0.9, 0.9, 0.9])
-rrtstar = RRTStar(cspace, x_start, x_goal) 
-@time for i in 1:4000
+rrtstar = RRTStar(cspace, x_start, x_goal; metric=ReedsSheppMetric(1.0)) 
+@time for i in 1:1000
     extend(rrtstar)
 end
 
@@ -30,6 +30,3 @@ function circle(h, k, r)
 end
 plot!(fig, circle(0.5, 0.5, 0.3), label="", seriestype=[:shape],
       c=:blue, linecolor=:black, lw=0.5, fillalpha=0.2)
-
-
-
