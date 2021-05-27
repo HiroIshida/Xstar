@@ -2,6 +2,7 @@ module Xstar
 
 using Plots
 using StaticArrays
+using LinearAlgebra
 export ConfigurationSpace, BoxSpace, uniform_sampling, visualize!
 export RRTStar, extend
 
@@ -20,10 +21,13 @@ function uniform_sampling(box::BoxSpace)
     r = box.lo + width .* rand(Float64, box.dim)
 end
 
-struct Node{N}
+mutable struct Node{N}
     x::SVector{N, Float64}
     cost::Float64
+    idx::Int
+    parent_idx::Union{Int, Nothing}
 end
+Node(x, cost, idx) = Node(x, cost, idx, nothing)
 
 function visualize!(box::BoxSpace{2}, fig)
     v1 = [box.lo[1], box.lo[2]]
@@ -43,28 +47,94 @@ function visualize!(box::BoxSpace{2}, fig)
     end
 end
 
+abstract type Metric end
+struct Euclidean <:Metric end
+(::Euclidean)(x1, x2) = norm(x1 - x2)
+
 mutable struct RRTStar{N}
     dim::Int
     cspace::ConfigurationSpace
     x_start::SVector{N}
     x_goal::SVector{N}
     nodes::Vector{Node{N}}
+    metric::Metric
+    mu::Float64
 end
-function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal) where N
+function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.1) where N
     nodes = Vector{Node{N}}(undef, 0)
-    RRTStar{N}(N, cspace, x_start, x_goal, nodes)
+    push!(nodes, Node(x_start, 0.0, 1))
+    RRTStar{N}(N, cspace, x_start, x_goal, nodes, Euclidean(), mu)
 end
 
 function extend(rrtstar::RRTStar{N}) where N
-    x_new = uniform_sampling(rrtstar.cspace)
-    node_new = Node{N}(x_new, 0.0)
-    push!(rrtstar.nodes, node_new)
+    x_rand = uniform_sampling(rrtstar.cspace)
+    node_nearest, x_new = _find_nearest_and_new(rrtstar, x_rand)
+    if is_obstacle_free(rrtstar, x_new) # TODO path
+
+        # find best node and cost
+        node_min = node_nearest
+        cost_min = node_nearest.cost + rrtstar.metric(node_nearest.x, x_new)
+
+        node_nears = _find_nears(rrtstar, x_new)
+        for node_near in node_nears
+            # TODO cache metric computation
+            cost_expect = node_near.cost + rrtstar.metric(node_near.x, x_new)
+            if cost_expect < cost_min
+                node_min = node_near
+                cost_min = cost_expect
+            end
+        end
+
+        idx_new = length(rrtstar.nodes) + 1
+        node_new = Node(x_new, cost_min, idx_new, node_min.idx)
+        push!(rrtstar.nodes, node_new)
+
+        # rewire
+        for node_near in node_nears
+            # collision_free TODO
+            if node_new.cost + rrtstar.metric(node_near.x, x_new) < node_near.cost
+                node_near.parent_idx = node_new.idx
+            end
+        end
+    end
+end
+
+is_obstacle_free(rrtstar::RRTStar, x) = true
+
+function _find_nears(rrtstar::RRTStar{N}, x_center) where N
+    gamma = 1.0
+    card = length(rrtstar.nodes)
+    r = min(gamma * (log(card)/card)^(1/N), rrtstar.mu)
+    predicate = (node)->(rrtstar.metric(node.x, x_center) < r)
+    nodes_nears = filter(predicate, rrtstar.nodes) # TODO doit lazy
+end
+
+function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
+    dist_min, idx_min = findmin((i)->rrtstar.metric(rrtstar.nodes[i].x, x_rand), 1:length(rrtstar.nodes))
+    node_nearest = rrtstar.nodes[idx_min]
+    x_nearest = node_nearest.x
+    if dist_min < rrtstar.mu
+        x_new = x_rand
+    else
+        x_new = x_nearest + normalize(x_rand - x_nearest) * rrtstar.mu
+    end
+    return node_nearest, x_new
 end
 
 function visualize!(rrtstar::RRTStar{2}, fig)
     visualize!(rrtstar.cspace, fig)
     xs, ys = [[n.x[i] for n in rrtstar.nodes] for i in 1:2]
     scatter!(fig, xs, ys, label="", marker=(:green))
+
+    for node in rrtstar.nodes
+        isnothing(node.parent_idx) && continue
+
+        node_parent = rrtstar.nodes[node.parent_idx]
+        x_child = node.x
+        x_parent = node_parent.x
+        xs, ys = [[x_child[i], x_parent[i]] for i in 1:2]
+        plot!(fig, xs, ys, label="", line=(:black))
+    end
 end
 
 
