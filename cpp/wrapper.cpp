@@ -1,11 +1,12 @@
 #include "reeds_shepp.h"
+#include "wrapper.h"
 void* create_rsspace(double r)
 {
   auto ptr = static_cast<void*>(new ReedsSheppStateSpace(r));
   return ptr;
 }
 
-double compute_cost(void* ptr, double x1[3], double x2[3]){
+double compute_dist(void* ptr, double x1[3], double x2[3]){
   auto space = static_cast<ReedsSheppStateSpace*>(ptr);
   return space->distance(x1, x2);
 }
