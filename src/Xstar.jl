@@ -23,6 +23,13 @@ struct BoxSpace{N} <: ConfigurationSpace{N}
     hi::SVector{N, Float64}
 end
 BoxSpace(dim::Int, lo, hi) = BoxSpace{dim}(dim, SVector{dim, Float64}(lo), SVector{dim, Float64}(hi))
+function is_inside(space::BoxSpace, x)
+    for i in 1:space.dim
+        x[i] < space.lo[i] && (return false)
+        x[i] > space.hi[i] && (return false)
+    end
+    return true
+end
 
 function uniform_sampling(box::BoxSpace)
     width = box.hi - box.lo
@@ -101,12 +108,15 @@ function extend(rrtstar::RRTStar{N}) where N
         # TODO cache metric computation
         cost_expect = node_near.cost + rrtstar.metric(node_near.x, x_new)
         if cost_expect < cost_min
-            node_min = node_near
-            cost_min = cost_expect
+            if is_obstacle_free(rrtstar, node_near, x_new)
+                node_min = node_near
+                cost_min = cost_expect
+            end
         end
     end
 
     idx_new = length(rrtstar.nodes) + 1
+    @assert is_obstacle_free(rrtstar, x_new)
     node_new = Node(x_new, cost_min, idx_new, node_min.idx)
     push!(rrtstar.nodes, node_new)
 
@@ -136,11 +146,14 @@ function is_obstacle_free(rrtstar::RRTStar{<:Any, Euclidean}, node_start::Node, 
 end
 
 function is_obstacle_free(rrtstar::RRTStar{3, ReedsSheppMetric}, node_start::Node, x_target)
-    pts = waypoints(rrtstar.metric, node_start.x, x_target, 0.05)
+    pts = waypoints(rrtstar.metric, node_start.x, x_target, 0.01)
     for pt in pts
         p = SVector{3, Float64}([pt[1], pt[2], pt[3]])
         is_obstacle_free(rrtstar, p) || (return false)
+        is_inside(rrtstar.cspace, p) || (return false)
     end
+    is_obstacle_free(rrtstar, x_target) || (return false)
+
     return true
 end
 
@@ -205,7 +218,7 @@ end
 function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
     visualize!(rrtstar.cspace, fig)
     xs, ys, zs = [[n.x[i] for n in rrtstar.nodes] for i in 1:3]
-    scatter!(fig, xs, ys, label="", marker=(:green))
+    scatter!(fig, xs, ys, label="", markercolor=:green, markersize=5, markeralpha=0.5)
     u = cos.(zs) * rrtstar.mu * 0.5
     v = sin.(zs) * rrtstar.mu * 0.5
     visualize_nodes!(rrtstar, rrtstar.nodes, fig)
@@ -213,7 +226,7 @@ function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
     if with_solution
         nodes_path = back_trace(rrtstar, rrtstar.goal_node)
         xs, ys, zs = [[n.x[i] for n in nodes_path] for i in 1:3]
-        scatter!(fig, xs, ys, label="", marker=(:blue))
+        scatter!(fig, xs, ys, label="", markercolor=:blue, markersize=5, markeralpha=1.0)
         visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0)
     end
 end
@@ -223,6 +236,7 @@ function back_trace(rrtstar::RRTStar, goal_node::Node)
     node = goal_node
     while node.idx!=1
         node = rrtstar.nodes[node.parent_idx]
+        @assert is_obstacle_free(rrtstar, node.x)
         push!(nodes, node)
     end
     reverse!(nodes)
