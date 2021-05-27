@@ -217,17 +217,19 @@ end
 
 function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
     visualize!(rrtstar.cspace, fig)
-    xs, ys, zs = [[n.x[i] for n in rrtstar.nodes] for i in 1:3]
+    xs, ys = [[n.x[i] for n in rrtstar.nodes] for i in 1:2]
     scatter!(fig, xs, ys, label="", markercolor=:green, markersize=5, markeralpha=0.5)
+    #=
     u = cos.(zs) * rrtstar.mu * 0.5
     v = sin.(zs) * rrtstar.mu * 0.5
-    visualize_nodes!(rrtstar, rrtstar.nodes, fig)
     with_arrow && quiver!(fig, xs, ys, quiver=(u, v))
+    =#
+    visualize_nodes!(rrtstar, rrtstar.nodes, fig)
     if with_solution
         nodes_path = back_trace(rrtstar, rrtstar.goal_node)
-        xs, ys, zs = [[n.x[i] for n in nodes_path] for i in 1:3]
+        xs, ys = [[n.x[i] for n in nodes_path] for i in 1:2]
         scatter!(fig, xs, ys, label="", markercolor=:blue, markersize=5, markeralpha=1.0)
-        visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0)
+        #visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0)
     end
 end
 function back_trace(rrtstar::RRTStar, goal_node::Node)
