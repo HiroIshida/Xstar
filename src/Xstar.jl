@@ -73,50 +73,53 @@ mutable struct RRTStar{N, MT}
     cspace::ConfigurationSpace
     x_start::SVector{N}
     x_goal::SVector{N}
+    goal_node::Union{Node{N}, Nothing}
     nodes::Vector{Node{N}}
     metric::MT
     mu::Float64
 end
-function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.1, metric=nothing) where N
+function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.2, metric=nothing) where N
     if isnothing(metric)
         metric = Euclidean()
     end
     nodes = Vector{Node{N}}(undef, 0)
     push!(nodes, Node(x_start, 0.0, 1))
-    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, nodes, metric, mu)
+    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, nothing, nodes, metric, mu)
 end
 
 function extend(rrtstar::RRTStar{N}) where N
     x_rand = uniform_sampling(rrtstar.cspace)
     node_nearest, x_new = _find_nearest_and_new(rrtstar, x_rand)
-    if is_obstacle_free(rrtstar, node_nearest, x_new) # TODO path
+    is_obstacle_free(rrtstar, node_nearest, x_new) || (return false) 
 
-        # find best node and cost
-        node_min = node_nearest
-        cost_min = node_nearest.cost + rrtstar.metric(node_nearest.x, x_new)
+    # find best node and cost
+    node_min = node_nearest
+    cost_min = node_nearest.cost + rrtstar.metric(node_nearest.x, x_new)
 
-        node_nears = _find_nears(rrtstar, x_new)
-        for node_near in node_nears
-            # TODO cache metric computation
-            cost_expect = node_near.cost + rrtstar.metric(node_near.x, x_new)
-            if cost_expect < cost_min
-                node_min = node_near
-                cost_min = cost_expect
-            end
-        end
-
-        idx_new = length(rrtstar.nodes) + 1
-        node_new = Node(x_new, cost_min, idx_new, node_min.idx)
-        push!(rrtstar.nodes, node_new)
-
-        # rewire
-        for node_near in node_nears
-            is_obstacle_free(rrtstar, node_new, node_near.x) || continue
-            if node_new.cost + rrtstar.metric(node_near.x, x_new) < node_near.cost
-                node_near.parent_idx = node_new.idx
-            end
+    node_nears = _find_nears(rrtstar, x_new)
+    for node_near in node_nears
+        # TODO cache metric computation
+        cost_expect = node_near.cost + rrtstar.metric(node_near.x, x_new)
+        if cost_expect < cost_min
+            node_min = node_near
+            cost_min = cost_expect
         end
     end
+
+    idx_new = length(rrtstar.nodes) + 1
+    node_new = Node(x_new, cost_min, idx_new, node_min.idx)
+    push!(rrtstar.nodes, node_new)
+
+    # rewire
+    for node_near in node_nears
+        is_obstacle_free(rrtstar, node_new, node_near.x) || continue
+        if node_new.cost + rrtstar.metric(node_near.x, x_new) < node_near.cost
+            node_near.parent_idx = node_new.idx
+        end
+    end
+    is_reached = rrtstar.metric(node_new.x, rrtstar.x_goal) < 0.1
+    is_reached && (rrtstar.goal_node = node_new)
+    return is_reached
 end
 
 is_obstacle_free(rrtstar::RRTStar, x) = error("please implement this")
@@ -133,7 +136,7 @@ function is_obstacle_free(rrtstar::RRTStar{<:Any, Euclidean}, node_start::Node, 
 end
 
 function is_obstacle_free(rrtstar::RRTStar{3, ReedsSheppMetric}, node_start::Node, x_target)
-    pts = waypoints(rrtstar.metric, node_start.x, x_target, 0.1)
+    pts = waypoints(rrtstar.metric, node_start.x, x_target, 0.05)
     for pt in pts
         p = SVector{3, Float64}([pt[1], pt[2], pt[3]])
         is_obstacle_free(rrtstar, p) || (return false)
@@ -162,8 +165,18 @@ function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
     return node_nearest, x_new
 end
 
-function visualize_nodes!(rrtstar::RRTStar, fig)
-    for node in rrtstar.nodes
+function truncated_point(rrtstar::RRTStar, x_nearest, x_rand)
+    x_new = x_nearest + normalize(x_rand - x_nearest) * rrtstar.mu
+end
+
+function truncated_point(rrtstar::RRTStar{3, ReedsSheppMetric}, x_nearest, x_rand)
+    pts = waypoints(rrtstar.metric, x_nearest, x_rand, rrtstar.mu)
+    pt = pts[2]
+    return SVector{3, Float64}(pt[1], pt[2], pt[3])
+end
+
+function visualize_nodes!(rrtstar::RRTStar, nodes, fig)
+    for node in nodes
         isnothing(node.parent_idx) && continue
 
         node_parent = rrtstar.nodes[node.parent_idx]
@@ -174,8 +187,8 @@ function visualize_nodes!(rrtstar::RRTStar, fig)
     end
 end
 
-function visualize_nodes!(rrtstar::RRTStar{3, ReedsSheppMetric}, fig)
-    for node in rrtstar.nodes
+function visualize_nodes!(rrtstar::RRTStar{3, ReedsSheppMetric}, nodes, fig; color=:black, width=0.5)
+    for node in nodes
         isnothing(node.parent_idx) && continue
 
         node_parent = rrtstar.nodes[node.parent_idx]
@@ -185,16 +198,35 @@ function visualize_nodes!(rrtstar::RRTStar{3, ReedsSheppMetric}, fig)
         pts = waypoints(rrtstar.metric, x_child, x_parent, 0.005)
         xs = [p[1] for p in pts]
         ys = [p[2] for p in pts]
-        plot!(fig, xs, ys, label="", line=(:black))
+        plot!(fig, xs, ys, label="", linecolor=color, linewidth=width, alpha=0.5)
     end
 end
 
-function visualize!(rrtstar::RRTStar, fig)
+function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
     visualize!(rrtstar.cspace, fig)
-    xs, ys = [[n.x[i] for n in rrtstar.nodes] for i in 1:2]
+    xs, ys, zs = [[n.x[i] for n in rrtstar.nodes] for i in 1:3]
     scatter!(fig, xs, ys, label="", marker=(:green))
-    visualize_nodes!(rrtstar, fig)
-
+    u = cos.(zs) * rrtstar.mu * 0.5
+    v = sin.(zs) * rrtstar.mu * 0.5
+    visualize_nodes!(rrtstar, rrtstar.nodes, fig)
+    with_arrow && quiver!(fig, xs, ys, quiver=(u, v))
+    if with_solution
+        nodes_path = back_trace(rrtstar, rrtstar.goal_node)
+        xs, ys, zs = [[n.x[i] for n in nodes_path] for i in 1:3]
+        scatter!(fig, xs, ys, label="", marker=(:blue))
+        visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0)
+    end
+end
+function back_trace(rrtstar::RRTStar, goal_node::Node)
+    nodes = Node[]
+    push!(nodes, goal_node)
+    node = goal_node
+    while node.idx!=1
+        node = rrtstar.nodes[node.parent_idx]
+        push!(nodes, node)
+    end
+    reverse!(nodes)
+    return nodes
 end
 
 
