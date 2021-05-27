@@ -4,7 +4,7 @@ using Plots
 using StaticArrays
 using LinearAlgebra
 export ConfigurationSpace, BoxSpace, uniform_sampling, visualize!
-export RRTStar, extend
+export RRTStar, extend, is_obstacle_free
 
 abstract type ConfigurationSpace{N} end
 uniform_sampling(cspace::ConfigurationSpace) = error("please implement this")
@@ -69,7 +69,7 @@ end
 function extend(rrtstar::RRTStar{N}) where N
     x_rand = uniform_sampling(rrtstar.cspace)
     node_nearest, x_new = _find_nearest_and_new(rrtstar, x_rand)
-    if is_obstacle_free(rrtstar, x_new) # TODO path
+    if is_obstacle_free(rrtstar, node_nearest, x_new) # TODO path
 
         # find best node and cost
         node_min = node_nearest
@@ -91,7 +91,7 @@ function extend(rrtstar::RRTStar{N}) where N
 
         # rewire
         for node_near in node_nears
-            # collision_free TODO
+            is_obstacle_free(rrtstar, node_new, node_near.x) || continue
             if node_new.cost + rrtstar.metric(node_near.x, x_new) < node_near.cost
                 node_near.parent_idx = node_new.idx
             end
@@ -99,7 +99,19 @@ function extend(rrtstar::RRTStar{N}) where N
     end
 end
 
-is_obstacle_free(rrtstar::RRTStar, x) = true
+is_obstacle_free(rrtstar::RRTStar, x) = error("please implement this")
+
+function is_obstacle_free(rrtstar::RRTStar, node_start::Node, x_target)
+    # assume x1 is known to be obstacle free
+    n_wp = 5
+    x_start = node_start.x
+    step = (x_target - x_start)/n_wp
+    for i in 1:n_wp
+        is_obstacle_free(rrtstar, x_start + step * i) || (return false)
+    end
+    return true
+end
+
 
 function _find_nears(rrtstar::RRTStar{N}, x_center) where N
     gamma = 1.0
