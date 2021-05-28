@@ -15,7 +15,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <cassert>
 
-typedef int (*ReedsSheppPathSamplingCallback)(double q[3], void* user_data);
+typedef int (*ReedsSheppPathSamplingCallback)(int idx, double q[3], void* user_data);
 typedef int (*ReedsSheppPathTypeCallback)(int t, void* user_data);
 
 class ReedsSheppStateSpace
@@ -52,7 +52,7 @@ public:
 
     void type(double q0[3], double q1[3], ReedsSheppPathTypeCallback cb, void* user_data);
 
-    void sample(double q0[3], double q1[3], double step_size, ReedsSheppPathSamplingCallback cb, void* user_data);
+    void sample(double q0[3], double q1[3], double step_size, ReedsSheppPathSamplingCallback cb, double* arr);
 
     /** \brief Return the shortest Reeds-Shepp path from SE(2) state state1 to SE(2) state state2 */
     ReedsSheppPath reedsShepp(double q0[3], double q1[3]);

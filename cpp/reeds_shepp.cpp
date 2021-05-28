@@ -530,15 +530,17 @@ void ReedsSheppStateSpace::type(double q0[3], double q1[3], ReedsSheppPathTypeCa
     return;
 }
 
-void ReedsSheppStateSpace::sample(double q0[3], double q1[3], double step_size, ReedsSheppPathSamplingCallback cb, void* user_data)
+void ReedsSheppStateSpace::sample(double q0[3], double q1[3], double step_size, ReedsSheppPathSamplingCallback cb, double* arr)
 {
     ReedsSheppPath path = reedsShepp(q0, q1);
     double dist = rho_ * path.length();
 
+    int idx = 0;
     for (double seg=0.0; seg<=dist; seg+=step_size){
         double qnew[3] = {};
         interpolate(q0, path, seg/rho_, qnew);
-        cb( qnew, user_data);
+        cb(idx, qnew, arr);
+        idx++;
     }
     return;
 }
