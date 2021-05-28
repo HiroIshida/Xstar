@@ -7,6 +7,7 @@ extern "C"{
 
   void* rspath_create(void* ptr, double q0[3], double q1[3]);
   double rspath_distance(void* ptr);
+  double rspath_interpolate(void* ptr_path, void* ptr_space, double q0[3], double seg, double* q_out);
 
 
 #ifdef __cplusplus

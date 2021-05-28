@@ -35,3 +35,10 @@ double rspath_distance(void* ptr){
   auto path = static_cast<ReedsSheppStateSpace::ReedsSheppPath*>(ptr);
   return path->length();
 }
+
+double rspath_interpolate(void* ptr_path, void* ptr_space, double q0[3], double seg, double* q_out)
+{
+  auto space = static_cast<ReedsSheppStateSpace*>(ptr_space);
+  auto path = static_cast<ReedsSheppStateSpace::ReedsSheppPath*>(ptr_path);
+  space->interpolate(q0, *path, seg, q_out);
+}
