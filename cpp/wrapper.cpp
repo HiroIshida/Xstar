@@ -18,10 +18,9 @@ int sample_callback(double x[3], void* user_data_){
   }
 }
 
-void sample_points(void* ptr, double x1[3], double x2[3], double* arr){
-  ReedsSheppPathSamplingCallback f;
-  f = &sample_callback;
+void sample_points(void* ptr, double x1[3], double x2[3], ReedsSheppPathSamplingCallback f){
   auto space = static_cast<ReedsSheppStateSpace*>(ptr);
-  space->sample(x1, x2, 0.1, f, static_cast<void*>(arr));
+  void* tmp;
+  space->sample(x1, x2, 0.1, f, tmp);
 }
 
