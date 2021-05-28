@@ -4,11 +4,22 @@ c_create_rsspace(r) = ccall((:create_rsspace, mylib), Ptr{Cvoid}, (Cdouble,), r)
 c_compute_rsdist(ptr, p1, p2) = ccall((:compute_dist, mylib), Cdouble, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble},), ptr, p1, p2)
 c_sample_points(ptr, p1, p2, cb, arr) = ccall((:sample_points, mylib), Cvoid, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cvoid}, Ptr{Cdouble}), ptr, p1, p2, cb, arr)
 
+c_rspath_create(ptr_space, q0, q1) = ccall((:rspath_create, mylib), 
+                                         Ptr{Cvoid}, 
+                                         (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble}),
+                                         ptr_space, q0, q1)
+
+c_rspath_distance(ptr_path) = ccall((:rspath_distance, mylib), Cdouble, (Ptr{Cvoid},), ptr_path)
+
 struct ReedsSheppMetric
     ptr::Ptr{Nothing}
 end
 ReedsSheppMetric(r::Float64) = ReedsSheppMetric(c_create_rsspace(r))
 (metric::ReedsSheppMetric)(p1, p2) = c_compute_rsdist(metric.ptr, p1, p2)
+
+struct ReedsSheppPath
+    ptr::Ptr{Nothing}
+end
 
 function inner(idx, q_new, arr)
     for i in 1:3
@@ -26,3 +37,8 @@ metric = ReedsSheppMetric(1.0)
 metric([0, 0, 0], [1., 1., 1.])
 arr = zeros(200)
 sample_points!(metric, [0, 0, 0], [1., 1., 1.], arr)
+
+ptr_path = c_rspath_create(metric.ptr, [0, 0, 0], [1., 1, 1])
+c_rspath_distance(ptr_path)
+
+

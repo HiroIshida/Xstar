@@ -1,5 +1,7 @@
 #include "reeds_shepp.h"
 #include "wrapper.h"
+
+
 void* create_rsspace(double r)
 {
   auto ptr = static_cast<void*>(new ReedsSheppStateSpace(r));
@@ -23,3 +25,13 @@ void sample_points(void* ptr, double x1[3], double x2[3], ReedsSheppPathSampling
   space->sample(x1, x2, 0.1, f, arr);
 }
 
+void* rspath_create(void* ptr, double q0[3], double q1[3]){
+  auto space = static_cast<ReedsSheppStateSpace*>(ptr);
+  ReedsSheppStateSpace::ReedsSheppPath* path_ptr = new ReedsSheppStateSpace::ReedsSheppPath(space->reedsShepp(q0, q1));
+  return static_cast<void*>(path_ptr);
+}
+
+double rspath_distance(void* ptr){
+  auto path = static_cast<ReedsSheppStateSpace::ReedsSheppPath*>(ptr);
+  return path->length();
+}
