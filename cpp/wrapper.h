@@ -2,6 +2,7 @@
 extern "C"{
 #endif
   void* create_rsspace(double r);
+  void rsspace_delete(void* ptr);
   double compute_dist(void* ptr, double x1[3], double x2[3]);
   void sample_points(void* ptr, double x1[3], double x2[3], ReedsSheppPathSamplingCallback f, double* arr);
 

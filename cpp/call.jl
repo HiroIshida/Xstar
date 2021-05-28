@@ -1,7 +1,9 @@
 import Base.finalizer
 using StaticArrays
 const mylib = joinpath(pwd(), "libc_reeds_shepp.so")
-c_create_rsspace(r) = ccall((:create_rsspace, mylib), Ptr{Cvoid}, (Cdouble,), r)
+c_rspace_cleate(r) = ccall((:create_rsspace, mylib), Ptr{Cvoid}, (Cdouble,), r)
+c_rsspace_delete(ptr) = ccall((:create_rsspace, mylib), Cvoid, (Ptr{Cvoid},), ptr)
+
 c_compute_rsdist(ptr, p1, p2) = ccall((:compute_dist, mylib), Cdouble, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble},), ptr, p1, p2)
 c_sample_points(ptr, p1, p2, cb, arr) = ccall((:sample_points, mylib), Cvoid, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cvoid}, Ptr{Cdouble}), ptr, p1, p2, cb, arr)
 
@@ -30,12 +32,15 @@ mutable struct ReedsSheppPath
 end
 distance(path::ReedsSheppPath) = c_rspath_distance(path.ptr)
 interpolate(path::ReedsSheppPath, seg::Float64, out::AbstractVector) = c_rspath_interpolate(path.ptr, path.ptr_to_space, path.q0, seg, out)
-#Base.finalizer(path::ReedsSheppPath) = (println("hoge"), c_rspath_delete(path.ptr))
 
 struct ReedsSheppMetric
     ptr::Ptr{Nothing}
+    function ReedsSheppMetric(r::Float64)
+        delete(metric::ReedsSheppMetric) = c_rsspace_delete(metric.ptr)
+        ptr = c_rspace_cleate(r)
+        new(ptr)
+    end
 end
-ReedsSheppMetric(r::Float64) = ReedsSheppMetric(c_create_rsspace(r))
 (metric::ReedsSheppMetric)(p1, p2) = c_compute_rsdist(metric.ptr, p1, p2)
 create_path(metric::ReedsSheppMetric, q0, q1) = ReedsSheppPath(c_rspath_create(metric.ptr, q0, q1), metric.ptr, q0)
 
