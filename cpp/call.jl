@@ -1,3 +1,4 @@
+import Base.finalizer
 using StaticArrays
 const mylib = joinpath(pwd(), "libc_reeds_shepp.so")
 c_create_rsspace(r) = ccall((:create_rsspace, mylib), Ptr{Cvoid}, (Cdouble,), r)
@@ -15,14 +16,21 @@ c_rspath_interpolate(ptr_path, ptr_space, q0, seg, q_out) = ccall((:rspath_inter
                                                                   Cvoid,
                                                                   (Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cdouble}, Cdouble, Ptr{Cdouble}),
                                                                   ptr_path, ptr_space, q0, seg, q_out)
+c_rspath_delete(ptr_path) = ccall((:rspath_delete, mylib), Cvoid, (Ptr{Cvoid},), ptr_path)
 
-struct ReedsSheppPath
+mutable struct ReedsSheppPath
     ptr::Ptr{Nothing}
     ptr_to_space::Ptr{Nothing}
     q0::Vector # TODO
+    function ReedsSheppPath(ptr, ptr_to_space, q0)
+        path = new(ptr, ptr_to_space, q0)
+        delete(path_::ReedsSheppPath) = c_rspath_delete(path_.ptr)
+        finalizer(delete, path)
+    end
 end
 distance(path::ReedsSheppPath) = c_rspath_distance(path.ptr)
 interpolate(path::ReedsSheppPath, seg::Float64, out::AbstractVector) = c_rspath_interpolate(path.ptr, path.ptr_to_space, path.q0, seg, out)
+#Base.finalizer(path::ReedsSheppPath) = (println("hoge"), c_rspath_delete(path.ptr))
 
 struct ReedsSheppMetric
     ptr::Ptr{Nothing}
@@ -57,6 +65,3 @@ interpolate(path, 0.1, a)
 using BenchmarkTools
 @btime metric([0, 0, 0], [1., 1., 1.])
 @btime create_path(metric, [0, 0, 0], [1., 1., 1.])
-
-
-

@@ -42,3 +42,9 @@ double rspath_interpolate(void* ptr_path, void* ptr_space, double q0[3], double 
   auto path = static_cast<ReedsSheppStateSpace::ReedsSheppPath*>(ptr_path);
   space->interpolate(q0, *path, seg, q_out);
 }
+
+void rspath_delete(void* ptr_path){
+  auto path = static_cast<ReedsSheppStateSpace::ReedsSheppPath*>(ptr_path);
+  free(path);
+}
+
