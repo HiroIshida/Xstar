@@ -1,8 +1,8 @@
 import Base.finalizer
 using StaticArrays
 const mylib = joinpath(pwd(), "libc_reeds_shepp.so")
-c_rspace_cleate(r) = ccall((:create_rsspace, mylib), Ptr{Cvoid}, (Cdouble,), r)
-c_rsspace_delete(ptr) = ccall((:create_rsspace, mylib), Cvoid, (Ptr{Cvoid},), ptr)
+c_rspace_cleate(r) = ccall((:rsspace_create, mylib), Ptr{Cvoid}, (Cdouble,), r)
+c_rsspace_delete(ptr) = ccall((:rsspace_delete, mylib), Cvoid, (Ptr{Cvoid},), ptr)
 
 c_compute_rsdist(ptr, p1, p2) = ccall((:compute_dist, mylib), Cdouble, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble},), ptr, p1, p2)
 c_sample_points(ptr, p1, p2, cb, arr) = ccall((:sample_points, mylib), Cvoid, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cvoid}, Ptr{Cdouble}), ptr, p1, p2, cb, arr)
