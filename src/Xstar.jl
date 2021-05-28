@@ -7,8 +7,9 @@ using Plots
 using StaticArrays
 using LinearAlgebra
 export ConfigurationSpace, BoxSpace, uniform_sampling, visualize!
-export Euclidean, ReedsSheppMetric, waypoints
+export Euclidean, DirectReedsSheppMetric, PythonReedsSheppMetric, CppReedsSheppMetric, waypoints
 export RRTStar, extend, is_obstacle_free
+
 
 function __init__()
     copy!(__reeds_shepp__, pyimport("reeds_shepp"))
@@ -66,11 +67,15 @@ abstract type Metric end
 struct Euclidean <:Metric end
 (::Euclidean)(x1, x2) = norm(x1 - x2)
 
-struct ReedsSheppMetric
+abstract type ReedsSheppMetric <: Metric end
+
+include("../cpp/call.jl")
+
+struct PythonReedsSheppMetric <: ReedsSheppMetric
     r::Float64
 end
-(metric::ReedsSheppMetric)(x1, x2) = __reeds_shepp__.path_length(x1, x2, metric.r)
-function waypoints(metric::ReedsSheppMetric, x1, x2, step)
+(metric::PythonReedsSheppMetric)(x1, x2) = __reeds_shepp__.path_length(x1, x2, metric.r)
+function waypoints(metric::PythonReedsSheppMetric, x1, x2, step)
     waypoints = __reeds_shepp__.path_sample(x1, x2, metric.r, step)
 end
 
@@ -145,7 +150,7 @@ function is_obstacle_free(rrtstar::RRTStar{<:Any, Euclidean}, node_start::Node, 
     return true
 end
 
-function is_obstacle_free(rrtstar::RRTStar{3, ReedsSheppMetric}, node_start::Node, x_target)
+function is_obstacle_free(rrtstar::RRTStar{3, <:ReedsSheppMetric}, node_start::Node, x_target)
     pts = waypoints(rrtstar.metric, node_start.x, x_target, 0.01)
     for pt in pts
         p = SVector{3, Float64}([pt[1], pt[2], pt[3]])
@@ -182,7 +187,7 @@ function truncated_point(rrtstar::RRTStar, x_nearest, x_rand)
     x_new = x_nearest + normalize(x_rand - x_nearest) * rrtstar.mu
 end
 
-function truncated_point(rrtstar::RRTStar{3, ReedsSheppMetric}, x_nearest, x_rand)
+function truncated_point(rrtstar::RRTStar{3, <:ReedsSheppMetric}, x_nearest, x_rand)
     pts = waypoints(rrtstar.metric, x_nearest, x_rand, rrtstar.mu)
     pt = pts[2]
     return SVector{3, Float64}(pt[1], pt[2], pt[3])
@@ -200,7 +205,7 @@ function visualize_nodes!(rrtstar::RRTStar, nodes, fig)
     end
 end
 
-function visualize_nodes!(rrtstar::RRTStar{3, ReedsSheppMetric}, nodes, fig; color=:black, width=0.5)
+function visualize_nodes!(rrtstar::RRTStar{3, <:ReedsSheppMetric}, nodes, fig; color=:black, width=0.5)
     for node in nodes
         isnothing(node.parent_idx) && continue
 
@@ -229,7 +234,7 @@ function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
         nodes_path = back_trace(rrtstar, rrtstar.goal_node)
         xs, ys = [[n.x[i] for n in nodes_path] for i in 1:2]
         scatter!(fig, xs, ys, label="", markercolor=:blue, markersize=5, markeralpha=1.0)
-        #visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0)
+        visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0)
     end
 end
 function back_trace(rrtstar::RRTStar, goal_node::Node)

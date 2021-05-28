@@ -33,40 +33,41 @@ end
 distance(path::ReedsSheppPath) = c_rspath_distance(path.ptr)
 interpolate(path::ReedsSheppPath, seg::Float64, out::AbstractVector) = c_rspath_interpolate(path.ptr, path.ptr_to_space, path.q0, seg, out)
 
-struct ReedsSheppMetric
+mutable struct CppReedsSheppMetric <: ReedsSheppMetric
     ptr::Ptr{Nothing}
-    function ReedsSheppMetric(r::Float64)
-        delete(metric::ReedsSheppMetric) = c_rsspace_delete(metric.ptr)
+    path_cache::Union{Nothing, ReedsSheppPath}
+    function CppReedsSheppMetric(r::Float64)
+        delete(metric::CppReedsSheppMetric) = c_rsspace_delete(metric.ptr)
         ptr = c_rspace_cleate(r)
-        new(ptr)
+        metric = new(ptr, nothing)
+        finalizer(delete, metric)
+        return metric
     end
 end
-(metric::ReedsSheppMetric)(p1, p2) = c_compute_rsdist(metric.ptr, p1, p2)
-create_path(metric::ReedsSheppMetric, q0, q1) = ReedsSheppPath(c_rspath_create(metric.ptr, q0, q1), metric.ptr, q0)
-
-
-function inner(idx, q_new, arr)
-    for i in 1:3
-        val = unsafe_load(q_new, i)
-        unsafe_store!(arr, val, 3 * idx + i)
+function (metric::CppReedsSheppMetric)(q0, q1) 
+    path = create_path(metric, q0, q1)
+    metric.path_cache = path
+    return distance(path)
+end
+create_path(metric::CppReedsSheppMetric, q0, q1) = ReedsSheppPath(c_rspath_create(metric.ptr, q0, q1), metric.ptr, q0)
+function waypoints(metric::CppReedsSheppMetric, q0, q1, step)
+    path = create_path(metric, q0, q1)
+    dist = distance(path)
+    num = Int(floor(dist/step) + 1)
+    pts = SVector{3, Float64}[]
+    for i in 1:num
+        a = zeros(3)
+        interpolate(path, (i-1) * step, a)
+        push!(pts, a)
     end
-    nothing
-end
-function sample_points!(metric::ReedsSheppMetric, p1, p2, arr)
-    inner_c = @cfunction(inner, Cvoid, (Cint, Ptr{Cdouble}, Ptr{Cdouble}))
-    c_sample_points(metric.ptr, p1, p2, inner_c, arr)
+    return pts
 end
 
-metric = ReedsSheppMetric(1.0)
-metric([0, 0, 0], [1., 1., 1.])
-arr = zeros(200)
-sample_points!(metric, [0, 0, 0], [1., 1., 1.], arr)
+function test()
+    metric = CppReedsSheppMetric(0.2)
+    path = create_path(metric, [0, 0, 0], [1., 1., 1.])
+    a = zeros(3)
+    interpolate(path, 0.3, a)
+    println(a)
+end
 
-path = create_path(metric, [0, 0, 0], [1., 1., 1.])
-a = zeros(3)
-interpolate(path, 0.1, a)
-
-# compare 
-using BenchmarkTools
-@btime metric([0, 0, 0], [1., 1., 1.])
-@btime create_path(metric, [0, 0, 0], [1., 1., 1.])
