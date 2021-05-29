@@ -40,10 +40,11 @@ end
 mutable struct Node{N}
     x::SVector{N, Float64}
     cost::Float64
+    cost_to_goal::Float64
     idx::Int
     parent_idx::Union{Int, Nothing}
 end
-Node(x, cost, idx) = Node(x, cost, idx, nothing)
+Node(x, cost, idx) = Node(x, cost, Inf, idx, nothing)
 
 function visualize!(box::BoxSpace, fig)
     v1 = [box.lo[1], box.lo[2]]
@@ -85,6 +86,7 @@ mutable struct RRTStar{N, MT}
     cspace::ConfigurationSpace
     x_start::SVector{N}
     x_goal::SVector{N}
+    sol_list::Vector{Node{N}}
     goal_node::Node{N}
     nodes::Vector{Node{N}}
     metric::MT
@@ -97,11 +99,18 @@ function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.2, metric=
     nodes = Vector{Node{N}}(undef, 0)
     goal_node = Node(x_goal, Inf, -1)
     push!(nodes, Node(x_start, 0.0, 1))
-    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, goal_node, nodes, metric, mu)
+    sol_list = Vector{Node{N}}(undef, 0)
+    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, sol_list, goal_node, nodes, metric, mu)
 end
-solution_found(rrtstar::RRTStar) = !isnothing(rrtstar.goal_node.parent_idx)
+solution_found(rrtstar::RRTStar) = !isempty(rrtstar.sol_list)
 
 function extend(rrtstar::RRTStar{N}) where N
+    if solution_found(rrtstar)
+        cost, idx_best = findmin([node.cost + node.cost_to_goal for node in rrtstar.sol_list])
+        rrtstar.goal_node.cost = cost
+        rrtstar.goal_node.parent_idx = rrtstar.sol_list[idx_best].idx
+    end
+
     x_rand = uniform_sampling(rrtstar.cspace)
     node_nearest, x_new = _find_nearest_and_new(rrtstar, x_rand)
     is_obstacle_free(rrtstar, node_nearest, x_new) || (return false) 
@@ -124,7 +133,7 @@ function extend(rrtstar::RRTStar{N}) where N
 
     idx_new = length(rrtstar.nodes) + 1
     @assert is_obstacle_free(rrtstar, x_new)
-    node_new = Node(x_new, cost_min, idx_new, node_min.idx)
+    node_new = Node(x_new, cost_min, Inf, idx_new, node_min.idx)
     push!(rrtstar.nodes, node_new)
 
     # rewire
@@ -135,12 +144,10 @@ function extend(rrtstar::RRTStar{N}) where N
         end
     end
 
-    goal_cost = rrtstar.metric(node_new.x, rrtstar.x_goal) + node_new.cost
-    goal_cost > rrtstar.goal_node.cost && return false
     is_reached = is_obstacle_free(rrtstar, node_new, rrtstar.x_goal)
     if is_reached
-        rrtstar.goal_node.parent_idx = node_new.idx
-        rrtstar.goal_node.cost = goal_cost
+        node_new.cost_to_goal = rrtstar.metric(node_new.x, rrtstar.x_goal)
+        push!(rrtstar.sol_list, node_new)
     end
     return is_reached
 end
