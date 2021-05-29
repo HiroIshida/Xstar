@@ -95,27 +95,14 @@ function visualize!(box::BoxSpace, fig)
 end
 
 abstract type Metric end
-function predicate_smaller_than(metric::Metric, x1, x2, r) 
-    val = metric(x1, x2)
-    return val < r, val
-end
+worse_calculating(metric::Metric, x1, x2, r) = true
 
 struct Euclidean <:Metric end
 (::Euclidean)(x1, x2) = norm(x1 - x2)
 
 abstract type ReedsSheppMetric <: Metric end
 heuristic(metric::ReedsSheppMetric, x1::AbstractVector, x2::AbstractVector) = norm(x1[1:2] - x2[1:2])
-function predicate_smaller_than(metric::ReedsSheppMetric, x1, x2, r)
-    if heuristic(metric, x1, x2) > r
-        return (false, NaN)
-    end
-    val = heuristic(metric, x1, x2)
-    if val < r
-        return (true, val)
-    else
-        return (false, NaN)
-    end
-end
+worse_calculating(metric::ReedsSheppMetric, x1, x2, r) = heuristic(metric, x1, x2) < r
 
 include("../cpp/call.jl")
 
@@ -234,7 +221,10 @@ function _find_nears(rrtstar::RRTStar{N}, x_center) where N
     gamma = 1.0
     card = length(rrtstar.nodes)
     r = min(gamma * (log(card)/card)^(1/N), rrtstar.mu)
-    pred = (node) -> predicate_smaller_than(rrtstar.metric, node.x, x_center, r)[1]
+    function pred(node)
+        worse_calculating(rrtstar.metric, node.x, x_center, r) || (return false)
+        return rrtstar.metric(node.x, x_center) < r
+    end
     filter(pred, rrtstar.nodes)
 end
 
@@ -242,9 +232,10 @@ function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
     dist_min = Inf
     idx_min = -1
     for node in rrtstar.nodes
-        is_smaller, dist = predicate_smaller_than(rrtstar.metric, node.x, x_rand, dist_min)
-        if is_smaller
-            dist_min = dist
+        worse_calculating(rrtstar.metric, node.x, x_rand, dist_min) || continue
+        dist_cand = rrtstar.metric(node.x, x_rand)
+        if dist_cand < dist_min
+            dist_min = dist_cand
             idx_min = node.idx
         end
     end
