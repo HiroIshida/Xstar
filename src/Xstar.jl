@@ -226,7 +226,17 @@ function _find_nears(rrtstar::RRTStar{N}, x_center) where N
 end
 
 function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
-    dist_min, idx_min = findmin((i)->rrtstar.metric(rrtstar.nodes[i].x, x_rand), 1:length(rrtstar.nodes))
+    dist_min = Inf
+    idx_min = -1
+    for node in rrtstar.nodes
+        norm(node.x[1:2] - x_rand[1:2]) > dist_min && continue
+        dist_min_cand = rrtstar.metric(node.x, x_rand)
+        if dist_min_cand < dist_min
+            dist_min = dist_min_cand
+            idx_min = node.idx
+        end
+    end
+
     node_nearest = rrtstar.nodes[idx_min]
     x_nearest = node_nearest.x
     if dist_min < rrtstar.mu
