@@ -3,6 +3,7 @@ using StaticArrays
 const mylib = joinpath(pwd(), "libc_reeds_shepp.so")
 c_rspace_cleate(r) = ccall((:rsspace_create, mylib), Ptr{Cvoid}, (Cdouble,), r)
 c_rsspace_delete(ptr) = ccall((:rsspace_delete, mylib), Cvoid, (Ptr{Cvoid},), ptr)
+c_rsspace_radius(ptr) = ccall((:rsspace_radius, mylib), Cdouble, (Ptr{Cvoid},), ptr)
 
 c_compute_rsdist(ptr, p1, p2) = ccall((:compute_dist, mylib), Cdouble, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble},), ptr, p1, p2)
 c_sample_points(ptr, p1, p2, cb, arr) = ccall((:sample_points, mylib), Cvoid, (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cvoid}, Ptr{Cdouble}), ptr, p1, p2, cb, arr)
@@ -30,8 +31,8 @@ mutable struct ReedsSheppPath
         finalizer(delete, path)
     end
 end
-distance(path::ReedsSheppPath) = c_rspath_distance(path.ptr)
-interpolate(path::ReedsSheppPath, seg::Float64, out::AbstractVector) = c_rspath_interpolate(path.ptr, path.ptr_to_space, path.q0, seg, out)
+distance(path::ReedsSheppPath) = c_rspath_distance(path.ptr) * c_rsspace_radius(path.ptr_to_space)
+interpolate(path::ReedsSheppPath, seg::Float64, out::AbstractVector) = c_rspath_interpolate(path.ptr, path.ptr_to_space, path.q0, seg/c_rsspace_radius(path.ptr_to_space), out)
 
 mutable struct CppReedsSheppMetric <: ReedsSheppMetric
     ptr::Ptr{Nothing}
@@ -44,6 +45,7 @@ mutable struct CppReedsSheppMetric <: ReedsSheppMetric
         return metric
     end
 end
+radius(metric::CppReedsSheppMetric) = c_rsspace_radius(metric.ptr)
 function (metric::CppReedsSheppMetric)(q0, q1) 
     path = create_path(metric, q0, q1)
     metric.path_cache = path

@@ -13,6 +13,12 @@ void rsspace_delete(void* ptr_space){
   free(space);
 }
 
+double rsspace_radius(void* ptr_space)
+{
+  auto space = static_cast<ReedsSheppStateSpace*>(ptr_space);
+  return space->rho_;
+}
+
 // deplicated
 double compute_dist(void* ptr_space, double x1[3], double x2[3]){
   auto space = static_cast<ReedsSheppStateSpace*>(ptr_space);
