@@ -85,7 +85,7 @@ mutable struct RRTStar{N, MT}
     cspace::ConfigurationSpace
     x_start::SVector{N}
     x_goal::SVector{N}
-    goal_node::Union{Node{N}, Nothing}
+    goal_node::Node{N}
     nodes::Vector{Node{N}}
     metric::MT
     mu::Float64
@@ -95,8 +95,9 @@ function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.2, metric=
         metric = Euclidean()
     end
     nodes = Vector{Node{N}}(undef, 0)
+    goal_node = Node(x_goal, Inf, -1)
     push!(nodes, Node(x_start, 0.0, 1))
-    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, nothing, nodes, metric, mu)
+    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, goal_node, nodes, metric, mu)
 end
 
 function extend(rrtstar::RRTStar{N}) where N
@@ -132,8 +133,10 @@ function extend(rrtstar::RRTStar{N}) where N
             node_near.parent_idx = node_new.idx
         end
     end
-    is_reached = rrtstar.metric(node_new.x, rrtstar.x_goal) < 0.1
-    is_reached && (rrtstar.goal_node = node_new)
+    is_reached = is_obstacle_free(rrtstar, node_new, rrtstar.x_goal)
+    if is_reached
+        rrtstar.goal_node.parent_idx = node_new.idx
+    end
     return is_reached
 end
 
