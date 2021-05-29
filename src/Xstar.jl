@@ -133,9 +133,13 @@ function extend(rrtstar::RRTStar{N}) where N
             node_near.parent_idx = node_new.idx
         end
     end
+
+    goal_cost = rrtstar.metric(node_new.x, rrtstar.x_goal) + node_new.cost
+    goal_cost > rrtstar.goal_node.cost && return false
     is_reached = is_obstacle_free(rrtstar, node_new, rrtstar.x_goal)
     if is_reached
         rrtstar.goal_node.parent_idx = node_new.idx
+        rrtstar.goal_node.cost = goal_cost
     end
     return is_reached
 end
