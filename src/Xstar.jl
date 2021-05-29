@@ -217,8 +217,12 @@ function _find_nears(rrtstar::RRTStar{N}, x_center) where N
     gamma = 1.0
     card = length(rrtstar.nodes)
     r = min(gamma * (log(card)/card)^(1/N), rrtstar.mu)
-    predicate = (node)->(rrtstar.metric(node.x, x_center) < r)
-    nodes_nears = filter(predicate, rrtstar.nodes) # TODO doit lazy
+    function predicate(node)
+        necc_cond = norm(node.x[1:2] - x_center[1:2]) < r
+        necc_cond || (return false)
+        return rrtstar.metric(node.x, x_center) < r
+    end
+    filter(predicate, rrtstar.nodes)
 end
 
 function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
