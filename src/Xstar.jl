@@ -125,8 +125,9 @@ mutable struct RRTStar{N, MT}
     nodes::Vector{Node{N}}
     metric::MT
     mu::Float64
+    is_informed::Bool
 end
-function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.2, metric=nothing) where N
+function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.2, metric=nothing, is_informed=false) where N
     if isnothing(metric)
         metric = Euclidean()
     end
@@ -134,9 +135,15 @@ function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.2, metric=
     goal_node = Node(x_goal, Inf, -1)
     push!(nodes, Node(x_start, 0.0, 1))
     sol_list = Vector{Node{N}}(undef, 0)
-    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, sol_list, goal_node, nodes, metric, mu)
+    RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, sol_list, goal_node, nodes, metric, mu, is_informed)
 end
 solution_found(rrtstar::RRTStar) = !isempty(rrtstar.sol_list)
+
+informed_sampling(rrtstar::RRTStar) = error("not implemented") # default
+function informed_sampling(rrtstar::RRTStar{3, MT}) where MT <: ReedsSheppMetric
+    ellipse = EllipticSE2(rrtstar.goal_node.cost, rrtstar.x_start, rrtstar.x_goal)
+    x_rand = uniform_sampling(ellipse)
+end
 
 function extend(rrtstar::RRTStar{N}) where N
     if solution_found(rrtstar)
@@ -145,9 +152,8 @@ function extend(rrtstar::RRTStar{N}) where N
         rrtstar.goal_node.parent_idx = rrtstar.sol_list[idx_best].idx
     end
 
-    if solution_found(rrtstar)
-        ellipse = EllipticSE2(rrtstar.goal_node.cost, rrtstar.x_start, rrtstar.x_goal)
-        x_rand = uniform_sampling(ellipse)
+    if solution_found(rrtstar) && rrtstar.is_informed
+        x_rand = informed_sampling(rrtstar)
     else
         x_rand = uniform_sampling(rrtstar.cspace)
     end
@@ -260,7 +266,7 @@ function truncated_point(rrtstar::RRTStar{3, <:ReedsSheppMetric}, x_nearest, x_r
     return SVector{3, Float64}(pt[1], pt[2], pt[3])
 end
 
-function visualize_nodes!(rrtstar::RRTStar, nodes, fig)
+function visualize_nodes!(rrtstar::RRTStar, nodes, fig; color=:black, width=0.5)
     for node in nodes
         isnothing(node.parent_idx) && continue
 
@@ -268,7 +274,7 @@ function visualize_nodes!(rrtstar::RRTStar, nodes, fig)
         x_child = node.x
         x_parent = node_parent.x
         xs, ys = [[x_child[i], x_parent[i]] for i in 1:2]
-        plot!(fig, xs, ys, label="", line=(:black))
+        plot!(fig, xs, ys, label="", linecolor=color, linewidth=width, alpha=0.5)
     end
 end
 
@@ -291,11 +297,6 @@ function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
     visualize!(rrtstar.cspace, fig)
     xs, ys = [[n.x[i] for n in rrtstar.nodes] for i in 1:2]
     scatter!(fig, xs, ys, label="", markercolor=:green, markersize=5, markeralpha=0.5)
-    #=
-    u = cos.(zs) * rrtstar.mu * 0.5
-    v = sin.(zs) * rrtstar.mu * 0.5
-    with_arrow && quiver!(fig, xs, ys, quiver=(u, v))
-    =#
     visualize_nodes!(rrtstar, rrtstar.nodes, fig)
     if with_solution && solution_found(rrtstar)
         nodes_path = back_trace(rrtstar, rrtstar.goal_node)
