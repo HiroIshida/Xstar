@@ -10,14 +10,13 @@
 // Then the ompl code is fetched and modified in pyReedsShepp https://github.com/ghliu/pyReedsShepp
 
 #include "reeds_shepp.h"
-#include <boost/math/constants/constants.hpp>
 
 
 namespace
 {
     // The comments, variable names, etc. use the nomenclature from the Reeds & Shepp paper.
 
-    const double pi = boost::math::constants::pi<double>();
+    const double pi = 3.14159265;
     const double twopi = 2. * pi;
     const double RS_EPS = 1e-6;
     const double ZERO = 10*std::numeric_limits<double>::epsilon();

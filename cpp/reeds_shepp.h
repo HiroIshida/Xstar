@@ -12,8 +12,11 @@
 #ifndef SPACES_REEDS_SHEPP_STATE_SPACE_
 #define SPACES_REEDS_SHEPP_STATE_SPACE_
 
-#include <boost/math/constants/constants.hpp>
+//#include <boost/math/constants/constants.hpp>
 #include <cassert>
+#include <cmath>
+#include <limits>
+#include <algorithm>
 
 typedef int (*ReedsSheppPathSamplingCallback)(int idx, double q[3], void* user_data);
 typedef int (*ReedsSheppPathTypeCallback)(int t, void* user_data);
