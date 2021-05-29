@@ -99,6 +99,7 @@ function RRTStar(cspace::ConfigurationSpace{N}, x_start, x_goal; mu=0.2, metric=
     push!(nodes, Node(x_start, 0.0, 1))
     RRTStar{N, typeof(metric)}(N, cspace, x_start, x_goal, goal_node, nodes, metric, mu)
 end
+solution_found(rrtstar::RRTStar) = !isnothing(rrtstar.goal_node.parent_idx)
 
 function extend(rrtstar::RRTStar{N}) where N
     x_rand = uniform_sampling(rrtstar.cspace)
@@ -237,7 +238,7 @@ function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
     with_arrow && quiver!(fig, xs, ys, quiver=(u, v))
     =#
     visualize_nodes!(rrtstar, rrtstar.nodes, fig)
-    if with_solution
+    if with_solution && solution_found(rrtstar)
         nodes_path = back_trace(rrtstar, rrtstar.goal_node)
         xs, ys = [[n.x[i] for n in nodes_path] for i in 1:2]
         scatter!(fig, xs, ys, label="", markercolor=:blue, markersize=5, markeralpha=1.0)
