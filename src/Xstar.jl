@@ -251,7 +251,7 @@ function _find_nearest_and_new(rrtstar::RRTStar, x_rand)
     if dist_min < rrtstar.mu
         x_new = x_rand
     else
-        x_new = x_nearest + normalize(x_rand - x_nearest) * rrtstar.mu
+        x_new = truncated_point(rrtstar, x_nearest, x_rand)
     end
     return node_nearest, x_new
 end
