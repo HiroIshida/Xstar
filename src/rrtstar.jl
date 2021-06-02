@@ -157,7 +157,7 @@ function truncated_point(rrtstar::RRTStar, x_nearest, x_rand)
     x_new = x_nearest + normalize(x_rand - x_nearest) * rrtstar.mu
 end
 
-function visualize_nodes!(rrtstar::RRTStar, nodes, fig; color=:black, width=0.5)
+function visualize_nodes!(rrtstar::RRTStar, nodes, fig; color=:black, width=0.5, alpha=0.3)
     for node in nodes
         isnothing(node.parent_idx) && continue
 
@@ -165,7 +165,7 @@ function visualize_nodes!(rrtstar::RRTStar, nodes, fig; color=:black, width=0.5)
         x_child = node.x
         x_parent = node_parent.x
         xs, ys = [[x_child[i], x_parent[i]] for i in 1:2]
-        plot!(fig, xs, ys, label="", linecolor=color, linewidth=width, alpha=0.5)
+        plot!(fig, xs, ys, label="", linecolor=color, linewidth=width, alpha=alpha)
     end
 end
 
@@ -177,8 +177,8 @@ function visualize!(rrtstar::RRTStar, fig; with_arrow=false, with_solution=true)
     if with_solution && solution_found(rrtstar)
         nodes_path = back_trace(rrtstar, rrtstar.goal_node)
         xs, ys = [[n.x[i] for n in nodes_path] for i in 1:2]
-        scatter!(fig, xs, ys, label="", markercolor=:blue, markersize=5, markeralpha=1.0)
-        visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0)
+        scatter!(fig, xs, ys, label="", markercolor=:blue, markersize=7, markeralpha=1.0)
+        visualize_nodes!(rrtstar, nodes_path, fig; color=:blue, width=2.0, alpha=1.0)
     end
 end
 function back_trace(rrtstar::RRTStar, goal_node::Node)

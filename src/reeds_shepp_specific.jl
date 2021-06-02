@@ -16,7 +16,7 @@ function truncated_point(rrtstar::RRTStar{3, <:ReedsSheppMetric}, x_nearest, x_r
     return SVector{3, Float64}(pt[1], pt[2], pt[3])
 end
 
-function visualize_nodes!(rrtstar::RRTStar{3, <:ReedsSheppMetric}, nodes, fig; color=:black, width=0.5)
+function visualize_nodes!(rrtstar::RRTStar{3, <:ReedsSheppMetric}, nodes, fig; color=:black, width=0.5, alpha=0.3)
     for node in nodes
         isnothing(node.parent_idx) && continue
 
@@ -27,7 +27,7 @@ function visualize_nodes!(rrtstar::RRTStar{3, <:ReedsSheppMetric}, nodes, fig; c
         pts = waypoints(rrtstar.metric, x_child, x_parent, 0.005)
         xs = [p[1] for p in pts]
         ys = [p[2] for p in pts]
-        plot!(fig, xs, ys, label="", linecolor=color, linewidth=width, alpha=0.5)
+        plot!(fig, xs, ys, label="", linecolor=color, linewidth=width, alpha=alpha)
     end
 end
 
