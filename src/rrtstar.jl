@@ -94,8 +94,10 @@ function extend(rrtstar::RRTStar{N}) where N
     # rewire
     for node_near in node_nears
         is_obstacle_free(rrtstar, node_new, node_near.x) || continue
-        if node_new.cost + rrtstar.metric(node_near.x, x_new) < node_near.cost
+        rewired_cost = node_new.cost + rrtstar.metric(node_near.x, x_new)
+        if rewired_cost < node_near.cost
             node_near.parent_idx = node_new.idx
+            node_near.cost = rewired_cost
         end
     end
 
